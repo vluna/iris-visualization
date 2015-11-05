@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang='en'>
+	<meta charset="utf-8">
+	<title>Assignment 5: Scatterplot Programming</title>
+	<style>
+		.axis path, .axis line {
+		    fill: none;
+		    stroke: black;
+		    shape-rendering: crispEdges;
+		}
+		body {
+			font: 12px sans-serif;
+		}
+		h1 {
+			font-family: sans-serif;
+			text-align: center;
+		}
+
+		.tooltip {   
+			display: none;
+			position: absolute;           
+		  	text-align: center; 
+		  	padding-top: 5px;           
+			width: 120px;                  
+			height: 65px;                 
+			font: 12px sans-serif;  
+			background: #FF9500;   
+			color: white;
+			border-radius: 8px; 
+		}
+
+		#slider{
+		    opacity: .4
+		}
+
+	</style>
+	<body>
+		<h1>Iris Graph</h2>
+		<script src="d3/d3.min.js"></script>
+		<script src="d3/d3.js"></script>
+
+		X Axis<select id = "xAxis"></select>
+		Y Axis<select id = "yAxis"></select>
+		Size
+		<select id = "size"></select>
+        <div id = "typesOfSpecies"></div>
+        <button id= 'reset'> Reset </button>
+      	<div class = "container"></div>
+
+		<script>
+			// Declare arrays for colour, dimeninsions and species
+			var species = ["Iris-setosa", "Iris-versicolor", "Iris-virginica"],
+				irisDimensions = ["Sepal Length", "Sepal Width", "Petal Length", "Petal Width"],
+				colour = ["#ae5a41", "#559e83", "#1b85b8"];
+
+			reset = d3.select('#reset');
+			// Declare width and height of the screen
+			var width = 950 - 30 - 100,
+				height = 500 - 30 - 80;
+
+			// Initial scales for x and y
+			var x = d3.scale.ordinal().domain(irisDimensions).rangePoints([55,width - 140]);
+			var y = d3.scale.ordinal().domain(irisDimensions).rangePoints([height-20, 10]);
+
+			// Variables to hold most common code
+			var line = d3.svg.line(),
+				axis = d3.svg.axis().orient("left");
+
+			// Will store the data for the iris dataset
+			var data;
+
+			// Creates the scatterplot
+			var scatterPlot;
+
+			// Holds the variables for the x and y axis and the size
+			var a = 0,
+				b = 1,
+				c = 2,
+				h = 3;
+
+			// Puts everything into a container
+			var svg = d3.select(".container")
+						.append("svg:svg")
+						.attr("height", height)
+						.attr("width", width)
+						.append("svg:g")
+						      
+			// Adds the tooltip for each one of the points 
+			var tooltip = d3.select("body")
+							.append("div")
+                            .attr("class", "tooltip");
+
+			// Loads the csv file for the data
+			d3.csv("iris.csv")
+			.row(function(d){d.selected = false; return d})
+			.get( function(error, irisData)
+			{
+				// Will store the data for the iris dataset
+				data = irisData;
+				visualize(); // Call visualize function
+			})
+
+			/*
+				This function will draw the circles and update the graph
+			*/
+			function visualize()
+			{
+				// MApping the values of data
+				var mapData = d3.keys(data[0]).filter(function(d){return d != "Species"});
+
+				// Update the x axis from the graph using the dropdown
+				d3.select("#xAxis")
+					.on("change", function()
+					{
+						a = this.selectedIndex; // Assign the index for x
+						drawCircles(); // Draw the circles
+					})
+					.selectAll("option")
+					.data(mapData)
+					.enter()
+					.append("option")
+					.attr("value", function(d){ return d})
+					.text(function(d){return d;});
+		
+				// Update the y axis from the graph using the dropdown
+				d3.select("#yAxis")
+					.on("change", function()
+					{
+						b = this.selectedIndex; //Assign the index with y
+						drawCircles(); // Draw circles
+					})
+					.selectAll("option")
+					.data(mapData)
+					.enter()
+					.append("option")
+					.attr("value", function(d){return d})
+					.text(function(d){return d;});
+				
+				// Update the size from the graph using the dropdown
+				d3.select("#size")
+					.on("change", function()
+					{
+						c = this.selectedIndex; // Assign the index to the size
+						drawCircles(); // Draw circles
+					})
+					.selectAll("option")
+					.data(mapData)
+					.enter()
+					.append("option")
+					.attr("value", function(d){return d})
+					.text(function(d){return d;});
+
+				// Checkboxes for the species
+				d3.select("#typesOfSpecies")
+					.selectAll("input")
+					.data(species)
+					.enter()
+					.append("label")
+					.text(function (d) {return d; })
+					.append("input")
+					.attr("type", "checkbox")
+					.attr("checked", true)
+					.attr("id", function(d){return d;})
+					.on("change", function(d)
+					{
+						// If the checkbox is not marked, change opacity to none
+						if (checkBoxState(d) == false)
+						{
+							svg.selectAll(".circle."+d)
+								.style("opacity", 0)
+						}
+
+						// If it is marked change opacity to full
+						else 
+						{
+							svg.selectAll("circle.circle."+d)
+								.style("opacity", 1)
+
+						}
+					});
+
+				// Draw the intial circles for the graph
+				scatterPlot = svg.selectAll("circle")
+					.data(data)
+					.enter()
+					.append("circle")
+					.attr("class", function(d){return "circle "+d["Species"]})
+					.attr("selected", true)
+					.attr("r", 5)
+					.attr("cx", 0)
+					.attr("cy", height)
+					.attr("fill", function(d)
+					{
+						if(d["Species"] == "Iris-setosa")
+							return colour[0];
+						else if (d["Species"] == "Iris-versicolor")
+							return colour[1];
+						else if (d["Species"] == "Iris-virginica")
+							return colour[2];
+					})
+					// When mouse is over a point the information will appear
+					.on("mouseover", function(d)
+					{
+                		tooltip.style("display", 'block');
+                  		tooltip.html(d["Species"] + "<br>" + mapData[a] + ": " + d[mapData[a]] 
+                  								  + "<br>" + mapData[b] + ": " + d[mapData[b]]
+                  								  + "<br>" + mapData[c] + ": " + d[mapData[c]]
+                  								  + "<br>" + mapData[h] + ": " + d[mapData[h]])
+                          		.style("left", (d3.event.pageX) + "px")
+                          		.style("top", (d3.event.pageY) + "px");
+                	})
+                	// When mouse is not over the point do not show the information
+                	.on("mouseout", function(d)
+                	{
+                  		tooltip.style("display", 'none');
+                	})
+                	// when click on the point, the other points change oppcacity
+                	.on("click", function(d)
+                	{
+                		// If the circles are selected change them to fals
+                		if(d.selected == true) 
+                		{
+                			d.selected = false;
+                		}
+
+                		// Otherwise change the opacity to full
+                		else 
+                		{
+                			d.selected = true;
+                			d3.select(this).attr('opacity', 1);
+
+                		}
+                		// When all the selection is false change the opacity to 10$
+                		scatterPlot.filter(function(d) { return d.selected == false })
+                			.attr('opacity', .1);
+					})
+
+					// When the reset button is click, restart the graph
+					reset.on('click', function(){ 
+						scatterPlot.filter(function(d) { d.selected = false; return true })
+                			.attr('opacity', 1);
+                	})
+
+				// Calling drawCircles function
+				drawCircles();
+			}
+
+			/*
+				Checks if the box are marked or not
+			*/
+			function checkBoxState(checkboxID)
+			{
+				return document.getElementById(checkboxID).checked;
+			}
+
+			/*
+				This function draws the legend
+				Code taken from the sample posted in canvas
+			*/
+			function drawLegend()
+			{		
+				var legend = svg.append("g")
+					.attr("class", "legend")
+
+				legend.append("text")
+					.text("Iris-setosa")
+					.attr({
+						x: 750,
+						y: 50
+					})
+				legend.append("circle")
+					.attr({
+						cx: 740,
+						cy: 45,
+						r: 5,
+						fill: colour[0]
+					})
+
+				legend.append("text")
+					.text("Iris-versicolor")
+					.attr({
+						x: 750,
+						y: 70
+					})
+				legend.append("circle")
+					.attr({
+						cx: 740,
+						cy: 65,
+						r: 5,
+						fill: colour[1]
+					})	
+
+				legend.append("text")
+					.text("Iris-virginica")
+					.attr({
+						x: 750,
+						y: 90
+					})
+				legend.append("circle")
+					.attr({
+						cx: 740,
+						cy: 85,
+						r: 5,
+						fill: colour[2]
+					})
+			}
+
+			/*
+				This function draws the circles
+			*/
+			function drawCircles()
+			{	
+				// Remove previous graph
+				svg.selectAll("g").remove();
+				svg.selectAll("text").remove();
+
+				// MApping the values of data
+				var mapData = d3.keys(data[0]).filter(function(d){return d != "Species"});
+
+				// Getting the scale for x and y
+				var xScale = d3.scale.linear().domain([d3.min(data, function(d){return d[mapData[a]];}), d3.max(data, function(d){return d[mapData[a]];})]).range([55, width-150]),
+					yScale = d3.scale.linear().domain([d3.min(data, function(d){return d[mapData[b]];}), d3.max(data, function(d){return d[mapData[b]];})]).range([height-40,10]);
+
+				// Set the orientation for the x axis to be at the bottom 
+				var xAxis = d3.svg.axis();
+				xAxis.scale(xScale)
+					.orient("bottom");
+
+				// Set the orientation for the y axis to be at the left
+				var yAxis = d3.svg.axis();
+				yAxis.scale(yScale)
+					.orient("left");
+
+				// Adds the text for the y axis
+				svg.append("g")
+					.attr("class", "axis")
+					.attr("transform", "translate(10," + (height - 30) + ")")
+					.call(xAxis);
+				svg.append("text")
+			    	.attr("class", "x label")
+			    	.attr("text-anchor", "end")
+			    	.attr("x", d3.max(data, function(d){return d[mapData[a]];})-10)
+			    	.attr("y", height-2)
+			    	.style("text-anchor", "end")
+			    	.text(mapData[a]);
+
+				// Adds the text for the y axis
+				svg.append("g")
+					.attr("class", "axis")
+					.attr("transform", "translate(" + 50 + ",0)")
+					.call(yAxis);
+				svg.append("text")
+					.attr("class", "y label")
+					.attr("transform", "rotate(-90)")
+					.attr("text-anchor", "end")
+					.attr("y", d3.max(data, function(d){return d[mapData[a]];})+10)
+					.attr("x", d3.max(data, function(d){return d[mapData[b]];})-20)
+					.style("text-anchor", "end")
+					.text(mapData[b]);
+
+
+
+				// Draw circles with in the correct location and size 
+				svg.selectAll("circle")
+					.attr("cx", function(d) {return xScale(d[mapData[a]]);})
+					.attr("cy", function(d) {return yScale(d[mapData[b]]);})
+					.attr("r", function(d) {return d[mapData[c]];})
+
+				sepalWidthBrush();
+				sepalLenghtBrush();
+				petalWidthBrush();
+				petalLenghtBrush();
+
+				drawLegend();// Draws the legend
+			}
+
+			/* 
+				Variables and funcitons below add the brush
+				Some of this code was taken from the tutorial
+			*/
+			var brushSepalWidth;
+			var brushSepalLenght;
+			var brushPetalWidth;
+			var brushPetalLength;
+
+			function sepalWidthBrush() 
+			{
+				var brushSepalWidthScale = d3.scale.linear()
+				                    .domain([0, 8])
+				                    .range([100, 200])
+
+				brushSepalWidth = d3.svg.brush()
+						    .x(brushSepalWidthScale)
+						    .extent([0, 8])
+							.on("brushend", brushSepalWidthEnd);
+
+				var brushSepalWidthAxis = d3.svg.axis()
+				                .orient("bottom")
+				                .ticks(2)
+				                .scale(brushSepalWidthScale)
+				
+				svg.append("text")
+					.attr({
+					    x: 700,
+					    y: 120,
+					})
+					.text("Sepal Width")
+
+				svg.append("g")
+				    .attr("class", "axis")
+				    .attr("transform", "translate(600,150)")
+				    .call(brushSepalWidthAxis);
+
+				var gbrushSepalWidth = svg.append("g")
+				    .attr("class", "brush")
+				    .call(brushSepalWidth);
+
+				gbrushSepalWidth.selectAll("rect")
+				    .attr("height", 20)
+				    .attr("id", "slider")
+				    .attr("transform", "translate(600,130)");
+			}
+
+			function sepalLenghtBrush() 
+			{
+				var brushSepalLenghtScale = d3.scale.linear()
+				                    .domain([0, 8])
+				                    .range([100, 200])
+
+				brushSepalLenght = d3.svg.brush()
+						    .x(brushSepalLenghtScale)
+						    .extent([0, 8])
+							.on("brushend", brushSepalLenghtEnd);
+
+				var brushSepalLenghtAxis = d3.svg.axis()
+				                .orient("bottom")
+				                .ticks(2)
+				                .scale(brushSepalLenghtScale)
+				
+				svg.append("text")
+					.attr({
+					    x: 700,
+					    y: 190,
+					})
+					.text("Sepal Lenght")
+
+				svg.append("g")
+				    .attr("class", "axis")
+				    .attr("transform", "translate(600,220)")
+				    .call(brushSepalLenghtAxis);
+
+				var gbrushSepalLenght = svg.append("g")
+				    .attr("class", "brush")
+				    .call(brushSepalLenght);
+
+				gbrushSepalLenght.selectAll("rect")
+				    .attr("height", 20)
+				    .attr("id", "slider")
+				    .attr("transform", "translate(600,200)");
+			}
+
+			function petalWidthBrush() 
+			{
+				var brushPetalWidthScale = d3.scale.linear()
+				                    .domain([0, 8])
+				                    .range([100, 200])
+
+				brushPetalWidth = d3.svg.brush()
+						    .x(brushPetalWidthScale)
+						    .extent([0, 8])
+							.on("brushend", brushPetalWidthEnd);
+
+				var brushPetalWidthAxis = d3.svg.axis()
+				                .orient("bottom")
+				                .ticks(2)
+				                .scale(brushPetalWidthScale)
+				
+				svg.append("text")
+					.attr({
+					    x: 700,
+					    y: 260,
+					})
+					.text("Petal Width")
+
+				svg.append("g")
+				    .attr("class", "axis")
+				    .attr("transform", "translate(600,290)")
+				    .call(brushPetalWidthAxis);
+
+				var gbrushPetalWidth = svg.append("g")
+				    .attr("class", "brush")
+				    .call(brushPetalWidth);
+
+				gbrushPetalWidth.selectAll("rect")
+				    .attr("height", 20)
+				    .attr("id", "slider")
+				    .attr("transform", "translate(600,270)");
+			}
+
+			function petalLenghtBrush() 
+			{
+				var brushPetalLenghtScale = d3.scale.linear()
+				                    .domain([0, 8])
+				                    .range([100, 200])
+
+				brushPetalLenght = d3.svg.brush()
+						    .x(brushPetalLenghtScale)
+						    .extent([0, 8])
+							.on("brushend", brushPetalLenghtEnd);
+
+				var brushPetalLenghtAxis = d3.svg.axis()
+				                .orient("bottom")
+				                .ticks(2)
+				                .scale(brushPetalLenghtScale)
+				
+				svg.append("text")
+					.attr({
+					    x: 700,
+					    y: 330,
+					})
+					.text("Petal Lenght")
+
+				svg.append("g")
+				    .attr("class", "axis")
+				    .attr("transform", "translate(600,360)")
+				    .call(brushPetalLenghtAxis);
+
+				var gbrushPetalLenght = svg.append("g")
+				    .attr("class", "brush")
+				    .call(brushPetalLenght);
+
+				gbrushPetalLenght.selectAll("rect")
+				    .attr("height", 20)
+				    .attr("id", "slider")
+				    .attr("transform", "translate(600,340)");
+			}
+
+		    function brushSepalWidthEnd() 
+		    {
+	            currentRange = brushSepalWidth.extent();
+
+	            var min = d3.min(currentRange);
+	            var max = d3.max(currentRange);
+
+				scatterPlot.attr("opacity", 0)
+					.filter( function (d) { return (d["Sepal Width"]>min && d["Sepal Width"] < max) })
+					.attr('opacity', 1);
+			}
+
+		    function brushSepalLenghtEnd() 
+		    {
+		    	currentRange = brushSepalLenght.extent();
+
+	            var min = d3.min(currentRange);
+	            var max = d3.max(currentRange);
+
+				scatterPlot.attr("opacity", 0)
+					.filter( function (d) { return (d["Sepal Length"]>min && d["Sepal Length"]<max)})
+					.attr('opacity', 1);
+		    }
+
+		    function brushPetalWidthEnd() 
+		    {
+		    	currentRange = brushPetalWidth.extent();
+
+	            var min = d3.min(currentRange);
+	            var max = d3.max(currentRange);
+
+				scatterPlot.attr("opacity", 0)
+					.filter( function (d) { return (d["Petal Width"]>min && d["Petal Width"] < max) })
+					.attr('opacity', 1);
+		    }
+
+		    function brushPetalLenghtEnd() 
+		    {
+		    	currentRange = brushPetalLenght.extent();
+
+	            var min = d3.min(currentRange);
+	            var max = d3.max(currentRange);
+
+				scatterPlot.attr("opacity", 0)
+					.filter( function (d) { return (d["Petal Length"]>min && d["Petal Length"]<max)})
+					.attr('opacity', 1);
+		    }
+		</script>
+	</body>
+</html>
+
+<!-- Resources:
+https://github.com/mbostock/d3/wiki/Tutorials
+http://www.verisi.com/resources/d3-tutorial-basic-charts.html
+Tooltip: http://www.d3noob.org/2013/01/adding-tooltips-to-d3js-graph.html
+		 http://bl.ocks.org/Caged/6476579
+		 http://bl.ocks.org/mbostock/1087001
+Mapping: http://dev.socrata.com/consumers/examples/simple-chart-with-d3.html
+		 http://stackoverflow.com/questions/19116103/selecting-d3-data-subset-based-on-column
+Dropdown: http://stackoverflow.com/questions/11903709/adding-drop-down-menu-using-d3-js
+	 	  http://stackoverflow.com/questions/24588883/populate-dropdown-list-with-csv-file-d3
+Checkbox: http://stackoverflow.com/questions/19263476/d3-v3-appending-checkbox
+		  http://stackoverflow.com/questions/17037862/filtering-data-using-checkboxes-d3
+		  http://stackoverflow.com/questions/19849738/checkbox-check-uncheck-using-d3
+		  http://stackoverflow.com/questions/6204885/get-checkbox-status-using-javascript
+Legend: https://gist.github.com/ZJONSSON/3918369
+Text: https://www.dashingd3js.com/svg-text-element
+Load CSV: https://github.com/mbostock/d3/wiki/CSV
+Shapes: https://github.com/mbostock/d3/wiki/SVG-Shapes
+Colour: http://bl.ocks.org/aaizemberg/78bd3dade9593896a59d 
+Grid: http://stackoverflow.com/questions/18439698/adding-grid-to-d3-js-line-chart"
+-->
